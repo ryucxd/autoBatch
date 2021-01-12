@@ -127,6 +127,7 @@ namespace autoBatch
                 startBatch();
                 Console.WriteLine("End of batch...");
                 Console.ReadLine();
+                Environment.Exit(-1);
             }
         }
 
@@ -231,7 +232,7 @@ namespace autoBatch
         }
 
         private static void WriteToPunchProgQ()
-        {
+               {
             //check if there is anything for the finn(?)
             string sql = "";
             int temp = 0;
@@ -256,9 +257,6 @@ namespace autoBatch
                     return; //there is nothing for the finn
 
                 //insert into bath header  (grab the max batch_id + 1 )
-                sql = "SELECT MAX(batch_id) + 1 FROM dbo.batch";
-                using (SqlCommand cmd = new SqlCommand(sql, conn))
-                    batch_id = Convert.ToInt32(cmd.ExecuteScalar());
 
                 //set batch id to something static because we want to replicate a finished search
                 // batch_id = 9692;
@@ -272,10 +270,18 @@ namespace autoBatch
                     doorCount = Convert.ToInt32(cmd.ExecuteScalar());
                 while (counter < doorCount)
                 {
+                    sql = "SELECT MAX(batch_id) + 1 FROM dbo.batch";
+                    using (SqlCommand cmd = new SqlCommand(sql, conn))
+                        batch_id = Convert.ToInt32(cmd.ExecuteScalar());
+
                     //grouping
                     sql = "SELECT [group] FROM dbo.auto_batch_finn_batch where program_id = '" + dt.Rows[counter][2] + "'";
                     using (SqlCommand cmd = new SqlCommand(sql, conn))
                         grouping = Convert.ToString(cmd.ExecuteScalar());
+                    
+                    sql = "SELECT [batch_id] FROM dbo.auto_batch_finn_batch where program_id = '" + dt.Rows[counter][2] + "'";
+                    using (SqlCommand cmd = new SqlCommand(sql, conn))
+                        batch_id = Convert.ToInt32(cmd.ExecuteScalar());  //not sure about this one  -- should work as intended now tho....
 
                     //batchheader
                     sql = "insert into dbo.batch_header (qid, qname, datecreated, machine) values ('" + batch_id + "','" + grouping + "','" + DateTime.Now.ToString() + "','Finn-Power');";
@@ -297,7 +303,7 @@ namespace autoBatch
                         da.Fill(finnBatchDT);
                     }
 
-                    Console.WriteLine(sql);
+                    //Console.WriteLine(sql);  //printing this sql is pretty pointless
                     Console.WriteLine("--");
 
                    sql = "insert into dbo.batch_programs (door_id, program_no, sheet_quantity, header_id) values ('" + finnBatchDT.Rows[counter][5].ToString() + "','" + finnBatchDT.Rows[counter][3].ToString() + "','" + finnBatchDT.Rows[counter][4].ToString() + "'," + finnBatchDT.Rows[counter][0].ToString() + ");";
@@ -308,7 +314,7 @@ namespace autoBatch
 
 
                         counter = counter + 1;
-                    Console.WriteLine("End of WriteToPunchProgQ loop - press enter to continue");
+                    Console.WriteLine("End of WriteToPunchProgQ loop - press any key to continue");
                     Console.ReadLine(); //pause
                 }
                 conn.Close();
@@ -331,6 +337,7 @@ namespace autoBatch
             int SheetY = 0;
             double SheetT = 0;
             int From = 0;
+            int index = 0;
             ///////////////////////////////////////////////
 
             //i dont know if it needs to look at whats there but for now im just going to make a new textfile and add to that each time
@@ -370,7 +377,7 @@ namespace autoBatch
                     //insert into bath header  (grab the max batch_id + 1 )
                     sql = "SELECT MAX(batch_id) + 1 FROM dbo.batch";
                     using (SqlCommand cmd = new SqlCommand(sql, conn))
-                        batch_id = Convert.ToInt32(cmd.ExecuteNonQuery());
+                        batch_id = Convert.ToInt32(cmd.ExecuteScalar());
 
                     //set batch id to something static because we want to replicate a finished search
                     //batch_id = 9692;
@@ -387,19 +394,25 @@ namespace autoBatch
                         sql = "SELECT [group] FROM dbo.auto_batch_rainer_batch where program_id = '" + dt.Rows[counter][2] + "'";
                         using (SqlCommand cmd = new SqlCommand(sql, conn))
                             grouping = Convert.ToString(cmd.ExecuteScalar());
-
                         //batchheader
-                        sql = "insert into dbo_batch_header (qid, qname, datecreated, machine) values ('" + batch_id + "','" + dt.Rows[counter][9] + "','" + DateTime.Now.ToString() + "','Finn-Power');";
-
+                        sql = "insert into dbo.batch_header (qid, qname, datecreated, machine) values ('" + batch_id + "','" + dt.Rows[counter][9] + "','" + DateTime.Now.ToString() + "','RAINER');";
+                        if (grouping.Length < 2)
+                        {
+                            counter = counter + 1;
+                            continue;
+                        }
+                        
                         Console.WriteLine(sql);
                         Console.WriteLine("--");
+                        using (SqlCommand cmd = new SqlCommand(sql, conn))
+                            cmd.ExecuteNonQuery();
 
-                        // i think this can largely be ignored by just reading the datatable from above... i think?
-                        sql = "SELECT dbo.batch_header.id, dbo.batch_header.qid, dbo.batch_header.qname, auto_batch_rainer_batch.program_id, auto_batch_rainer_batch.FirstOfquantity, auto_batch_rainer_batch.door_id " +
-                            "FROM auto_batch_rainer_batch " +
-                            "INNER JOIN dbo.batch_header ON auto_batch_rainer_batch.[group] = dbo.batch_header.qname " +
-                            "WHERE [group] = '" + grouping + "' " +
-                            "GROUP BY dbo.batch_header.id, dbo.batch_header.qid, dbo.batch_header.qname, auto_batch_rainer_batch.program_id, auto_batch_rainer_batch.FirstOfquantity, auto_batch_rainer_batch.door_id";
+                            // i think this can largely be ignored by just reading the datatable from above... i think?
+                            sql = "SELECT dbo.batch_header.id, dbo.batch_header.qid, dbo.batch_header.qname, auto_batch_rainer_batch.program_id, auto_batch_rainer_batch.FirstOfquantity, auto_batch_rainer_batch.door_id " +
+                                "FROM auto_batch_rainer_batch " +
+                                "INNER JOIN dbo.batch_header ON auto_batch_rainer_batch.[group] = dbo.batch_header.qname " +
+                                "WHERE [group] = '" + grouping + "' " +
+                                "GROUP BY dbo.batch_header.id, dbo.batch_header.qid, dbo.batch_header.qname, auto_batch_rainer_batch.program_id, auto_batch_rainer_batch.FirstOfquantity, auto_batch_rainer_batch.door_id";
                         using (SqlCommand cmd = new SqlCommand(sql, conn))
                         {
                             SqlDataAdapter da = new SqlDataAdapter(cmd);  //this cannot possibly work without the batchheader insert running
@@ -411,6 +424,10 @@ namespace autoBatch
 
                         LString = grouping;
                         LArray = LString.Split(' ');    //Split(LString);
+                        Console.WriteLine(LArray[1].ToString());
+                        Console.WriteLine(LArray[2].ToString());
+                        Console.WriteLine(LArray[3].ToString());
+                        Console.WriteLine(LArray[4].ToString()); //test the array and see where the problem is
 
                         Sheet = "(0) " + LArray[2].ToString() + " " + LArray[3] + " " + LArray[4] + " " + LArray[1]; //WHAT IS THE 1 AT THE END???
                         SheetMNUM = 0; 
@@ -420,22 +437,27 @@ namespace autoBatch
                         SheetT = Convert.ToDouble(LArray[1]);
                         From = 0;
 
-                        Console.WriteLine(sql);
+                        //Console.WriteLine(sql); -
                         Console.WriteLine("--");
 
-                        //dt is null because grouping does not have a string! need to sort this out first because its breaking the code (after it works we can account for actual nulls here)
-                       // sql = "insert into dbo_batch_programs (door_id, program_no, sheet_quantity, header_id) values ('" + finnBatchDT.Rows[counter][5].ToString() + "','" + finnBatchDT.Rows[counter][3].ToString() + "','" + finnBatchDT.Rows[counter][4].ToString() + "'," + finnBatchDT.Rows[counter][0].ToString() + ");";
-                        //Console.WriteLine(sql);
-                        //Console.WriteLine("--");
-                        counter = counter + 1;
-                        Console.WriteLine("End of WriteToPunchProgQRAINER loop - press enter to continue");
+                       
+                        // 12321  -counter
+                       sql = "insert into dbo_batch_programs (door_id, program_no, sheet_quantity, header_id) values ('" + finnBatchDT.Rows[counter][5].ToString() + "','" + finnBatchDT.Rows[counter][3].ToString() + "','" + finnBatchDT.Rows[counter][4].ToString() + "'," + finnBatchDT.Rows[counter][0].ToString() + ");";
+                        using (SqlCommand cmd = new SqlCommand(sql, conn))
+                        {
+                            cmd.ExecuteNonQuery();
+                        }
+                            //Console.WriteLine(sql);
+                            //Console.WriteLine("--");
+                            counter = counter + 1;
+                        Console.WriteLine("End of WriteToPunchProgQRAINER loop - press any key to continue");
                         Console.ReadLine(); //pause
 
                         //write to the xml file here 
 
 
                         writer.Write("<Job>" + Environment.NewLine) ;
-                        writer.Write("<Index>" + 1 + "</Index>" + Environment.NewLine);
+                        writer.Write("<Index>" + index.ToString() + "</Index>" + Environment.NewLine); ; //+ 1 index each time :}
                         writer.Write("<PathName>" + PathName + "</PathName>" + Environment.NewLine);
                         writer.Write("<Name>" + progName + "</Name>" + Environment.NewLine);
                         writer.Write("<FinishedNumber>0</FinishedNumber>" + Environment.NewLine);
@@ -449,15 +471,14 @@ namespace autoBatch
                         writer.Write("<SheetT>" + SheetT + "</SheetT>" + Environment.NewLine);  //these need some adjusting like the grouping will get scuffed if it has an extra space
                         writer.Write("<From>" + From + "</From>" + Environment.NewLine);
                         writer.Write("</Job>" + Environment.NewLine);
-
+                        index = index + 1;
                     }
                     conn.Close();
 
                 }
                 writer.Write("</JobList>");
             }
-        }  //this cant really be tested because there are 0 entries of 'mild steel in the csv'
-        //i dont know about this one chief 
+        }  
 
         private static void autoWriteToFinn() //this wrtes to the table thats on the finn - just need to select whats in selected door
         {
