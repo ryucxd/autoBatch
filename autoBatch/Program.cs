@@ -468,7 +468,7 @@ namespace autoBatch
                         writer.Write("<SheetM>" + SheetM + "</SheetM>" + Environment.NewLine);
                         writer.Write("<SheetX>" + SheetX + "</SheetX>" + Environment.NewLine);
                         writer.Write("<SheetY>" + SheetY + "</SheetY>" + Environment.NewLine);
-                        writer.Write("<SheetT>" + SheetT + "</SheetT>" + Environment.NewLine);  //these need some adjusting like the grouping will get scuffed if it has an extra space
+                        writer.Write("<SheetT>" + SheetT + "</SheetT>" + Environment.NewLine);  //these need some adjusting like the grouping will get scuffed if it has an extra space (think this has been fixed automatically by having the material set to zintex/gav statically)
                         writer.Write("<From>" + From + "</From>" + Environment.NewLine);
                         writer.Write("</Job>" + Environment.NewLine);
                         index = index + 1;
