@@ -166,7 +166,7 @@ namespace autoBatch
                 {
                     conn.Open();
 
-                    sql = "SELECT DISTINCT * FROM dbo.auto_batch_selected_door WHERE door_id = " + distinctDoorIDDT.Rows[temp][0].ToString() ;
+                    sql = "SELECT DISTINCT * FROM dbo.auto_batch_selected_door WHERE door_id = " + distinctDoorIDDT.Rows[temp][0].ToString();
                     using (SqlCommand cmdDT = new SqlCommand(sql, conn))
                     {
                         SqlDataAdapter da = new SqlDataAdapter(cmdDT);
@@ -212,13 +212,13 @@ namespace autoBatch
 
                     using (SqlCommand cmd = new SqlCommand(sql, conn))
                         cmd.ExecuteNonQuery();
-                        Console.WriteLine(sql);
+                    Console.WriteLine(sql);
 
                     //set as batched
                     sql = "update dbo.door set batch_live =0, batched=-1 where id =" + door_id;
                     using (SqlCommand cmd = new SqlCommand(sql, conn))
                         cmd.ExecuteNonQuery();
-                    
+
 
                     Console.WriteLine(sql);
                     count = count - 1;
@@ -232,7 +232,7 @@ namespace autoBatch
         }
 
         private static void WriteToPunchProgQ()
-               {
+        {
             //check if there is anything for the finn(?)
             string sql = "";
             int temp = 0;
@@ -278,13 +278,13 @@ namespace autoBatch
                     sql = "SELECT [group] FROM dbo.auto_batch_finn_batch where program_id = '" + dt.Rows[counter][2] + "'";
                     using (SqlCommand cmd = new SqlCommand(sql, conn))
                         grouping = Convert.ToString(cmd.ExecuteScalar());
-                    
+
                     sql = "SELECT [batch_id] FROM dbo.auto_batch_finn_batch where program_id = '" + dt.Rows[counter][2] + "'";
                     using (SqlCommand cmd = new SqlCommand(sql, conn))
                         batch_id = Convert.ToInt32(cmd.ExecuteScalar());  //not sure about this one  -- should work as intended now tho....
 
                     //batchheader
-                    sql = "insert into dbo.batch_header (qid, qname, datecreated, machine) values ('" + batch_id + "','" + grouping + "','" + DateTime.Now.ToString() + "','Finn-Power');";
+                    sql = "insert into dbo.batch_header (qid, qname, datecreated, machine) values ('" + batch_id + "','" + grouping + "','" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "','Finn-Power');";
                     using (SqlCommand cmd = new SqlCommand(sql, conn))
                         cmd.ExecuteNonQuery();
                     Console.WriteLine(sql);
@@ -306,16 +306,16 @@ namespace autoBatch
                     //Console.WriteLine(sql);  //printing this sql is pretty pointless
                     Console.WriteLine("--");
 
-                   sql = "insert into dbo.batch_programs (door_id, program_no, sheet_quantity, header_id) values ('" + finnBatchDT.Rows[counter][5].ToString() + "','" + finnBatchDT.Rows[counter][3].ToString() + "','" + finnBatchDT.Rows[counter][4].ToString() + "'," + finnBatchDT.Rows[counter][0].ToString() + ");";
+                    sql = "insert into dbo.batch_programs (door_id, program_no, sheet_quantity, header_id) values ('" + finnBatchDT.Rows[counter][5].ToString() + "','" + finnBatchDT.Rows[counter][3].ToString() + "','" + finnBatchDT.Rows[counter][4].ToString() + "'," + finnBatchDT.Rows[counter][0].ToString() + ");";
                     using (SqlCommand cmd = new SqlCommand(sql, conn))
                         cmd.ExecuteNonQuery();
-                        //Console.WriteLine(sql);
-                        //Console.WriteLine("--"); ;
+                    //Console.WriteLine(sql);
+                    //Console.WriteLine("--"); ;
 
 
-                        counter = counter + 1;
+                    counter = counter + 1;
                     Console.WriteLine("End of WriteToPunchProgQ loop - press any key to continue");
-                    Console.ReadLine(); //pause
+                    //Console.ReadLine(); //pause
                 }
                 conn.Close();
             }
@@ -395,27 +395,27 @@ namespace autoBatch
                         using (SqlCommand cmd = new SqlCommand(sql, conn))
                             grouping = Convert.ToString(cmd.ExecuteScalar());
                         //batchheader
-                        sql = "insert into dbo.batch_header (qid, qname, datecreated, machine) values ('" + batch_id + "','" + dt.Rows[counter][9] + "','" + DateTime.Now.ToString() + "','RAINER');";
+                        sql = "insert into dbo.batch_header (qid, qname, datecreated, machine) values ('" + batch_id + "','" + grouping.ToString() + "','" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "','RAINER');";
                         if (grouping.Length < 2)
                         {
                             counter = counter + 1;
                             continue;
                         }
-                        
+
                         Console.WriteLine(sql);
                         Console.WriteLine("--");
                         using (SqlCommand cmd = new SqlCommand(sql, conn))
                             cmd.ExecuteNonQuery();
 
-                            // i think this can largely be ignored by just reading the datatable from above... i think?
-                            sql = "SELECT dbo.batch_header.id, dbo.batch_header.qid, dbo.batch_header.qname, auto_batch_rainer_batch.program_id, auto_batch_rainer_batch.FirstOfquantity, auto_batch_rainer_batch.door_id " +
-                                "FROM auto_batch_rainer_batch " +
-                                "INNER JOIN dbo.batch_header ON auto_batch_rainer_batch.[group] = dbo.batch_header.qname " +
-                                "WHERE [group] = '" + grouping + "' " +
-                                "GROUP BY dbo.batch_header.id, dbo.batch_header.qid, dbo.batch_header.qname, auto_batch_rainer_batch.program_id, auto_batch_rainer_batch.FirstOfquantity, auto_batch_rainer_batch.door_id";
+                        // i think this can largely be ignored by just reading the datatable from above... i think?
+                        sql = "SELECT dbo.batch_header.id, dbo.batch_header.qid, dbo.batch_header.qname, auto_batch_rainer_batch.program_id, auto_batch_rainer_batch.FirstOfquantity, auto_batch_rainer_batch.door_id " +
+                            "FROM auto_batch_rainer_batch " +
+                            "INNER JOIN dbo.batch_header ON auto_batch_rainer_batch.[group] = dbo.batch_header.qname " +
+                            "WHERE [group] = '" + grouping + "' " +
+                            "GROUP BY dbo.batch_header.id, dbo.batch_header.qid, dbo.batch_header.qname, auto_batch_rainer_batch.program_id, auto_batch_rainer_batch.FirstOfquantity, auto_batch_rainer_batch.door_id";
                         using (SqlCommand cmd = new SqlCommand(sql, conn))
                         {
-                            SqlDataAdapter da = new SqlDataAdapter(cmd);  //this cannot possibly work without the batchheader insert running
+                            SqlDataAdapter da = new SqlDataAdapter(cmd); 
                             da.Fill(finnBatchDT);
                         }
                         //fullSheetName = rs_rainer!group
@@ -430,7 +430,7 @@ namespace autoBatch
                         Console.WriteLine(LArray[4].ToString()); //test the array and see where the problem is
 
                         Sheet = "(0) " + LArray[2].ToString() + " " + LArray[3] + " " + LArray[4] + " " + LArray[1]; //WHAT IS THE 1 AT THE END???
-                        SheetMNUM = 0; 
+                        SheetMNUM = 0;
                         SheetM = LArray[2] + " " + LArray[1];
                         SheetX = LArray[3];
                         SheetY = Convert.ToInt32(LArray[4]);
@@ -440,23 +440,33 @@ namespace autoBatch
                         //Console.WriteLine(sql); -
                         Console.WriteLine("--");
 
-                       
+
                         // 12321  -counter
-                       sql = "insert into dbo_batch_programs (door_id, program_no, sheet_quantity, header_id) values ('" + finnBatchDT.Rows[counter][5].ToString() + "','" + finnBatchDT.Rows[counter][3].ToString() + "','" + finnBatchDT.Rows[counter][4].ToString() + "'," + finnBatchDT.Rows[counter][0].ToString() + ");";
-                        using (SqlCommand cmd = new SqlCommand(sql, conn))
+                        Console.WriteLine(finnBatchDT.Rows[counter][0].ToString());
+                        //Console.WriteLine(finnBatchDT.Rows[counter][1].ToString());
+                        //Console.WriteLine(finnBatchDT.Rows[counter][2].ToString());
+                        //Console.WriteLine(finnBatchDT.Rows[counter][3].ToString());
+                        //Console.WriteLine(finnBatchDT.Rows[counter][4].ToString());
+                        //Console.WriteLine(finnBatchDT.Rows[counter][5].ToString());
+                        for (int row = 0; row < finnBatchDT.Rows.Count; row++)
                         {
-                            cmd.ExecuteNonQuery();
+                            sql = "insert into dbo.batch_programs (door_id, program_no, sheet_quantity, header_id) values ('" + finnBatchDT.Rows[row][5].ToString() + "','" + finnBatchDT.Rows[row][3].ToString() + "','" + finnBatchDT.Rows[row][4].ToString() + "'," + finnBatchDT.Rows[row][0].ToString() + ");";
+                            using (SqlCommand cmd = new SqlCommand(sql, conn))
+                            {
+                                cmd.ExecuteNonQuery();
+                            }
+                            row = row++;
                         }
-                            //Console.WriteLine(sql);
-                            //Console.WriteLine("--");
-                            counter = counter + 1;
+                        //Console.WriteLine(sql);
+                        //Console.WriteLine("--");
+                        counter = counter + 1;
                         Console.WriteLine("End of WriteToPunchProgQRAINER loop - press any key to continue");
                         Console.ReadLine(); //pause
 
                         //write to the xml file here 
 
 
-                        writer.Write("<Job>" + Environment.NewLine) ;
+                        writer.Write("<Job>" + Environment.NewLine);
                         writer.Write("<Index>" + index.ToString() + "</Index>" + Environment.NewLine); ; //+ 1 index each time :}
                         writer.Write("<PathName>" + PathName + "</PathName>" + Environment.NewLine);
                         writer.Write("<Name>" + progName + "</Name>" + Environment.NewLine);
@@ -469,16 +479,15 @@ namespace autoBatch
                         writer.Write("<SheetX>" + SheetX + "</SheetX>" + Environment.NewLine);
                         writer.Write("<SheetY>" + SheetY + "</SheetY>" + Environment.NewLine);
                         writer.Write("<SheetT>" + SheetT + "</SheetT>" + Environment.NewLine);  //these need some adjusting like the grouping will get scuffed if it has an extra space (think this has been fixed automatically by having the material set to zintex/gav statically)
-                        writer.Write("<From>" + From + "</From>" + Environment.NewLine);
+                        writer.Write("<From>" + From + "</From>" + Environment.NewLine);          //needs to be tested tho
                         writer.Write("</Job>" + Environment.NewLine);
                         index = index + 1;
                     }
                     conn.Close();
-
                 }
                 writer.Write("</JobList>");
             }
-        }  
+        }
 
         private static void autoWriteToFinn() //this wrtes to the table thats on the finn - just need to select whats in selected door
         {
@@ -494,9 +503,7 @@ namespace autoBatch
                 }
                 //now we loop through the DT
                 //needs to have access to the finn
-
-                //cant
-
+                //its a database file on W drive - can i even write to that from c#? i mean probably ye 
                 conn.Close();
             }
         }
