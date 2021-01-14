@@ -504,6 +504,56 @@ namespace autoBatch
                 //now we loop through the DT
                 //needs to have access to the finn
                 //its a database file on W drive - can i even write to that from c#? i mean probably ye 
+
+                /*//////////////////////////////////////////////// 
+                sql_select = "SELECT union_finn_batch.batch_id, union_finn_batch.group, First(union_finn_batch.FirstOfthickness) AS FirstOfFirstOfthickness, First(union_finn_batch.FirstOfquantity) AS FirstOfFirstOfquantity, First(union_finn_batch.FirstOfmaterial_type) AS FirstOfFirstOfmaterial_type, First(union_finn_batch.FirstOflength) AS FirstOfFirstOflength, First(union_finn_batch.FirstOfwidth) AS FirstOfFirstOfwidth FROM union_finn_batch " & _
+                "GROUP BY union_finn_batch.batch_id, union_finn_batch.group HAVING (((union_finn_batch.batch_id) = " & TempVars!batch_id & ")) ORDER BY First(union_finn_batch.FirstOfmaterial_type), First(union_finn_batch.FirstOfthickness), First(union_finn_batch.FirstOflength), First(union_finn_batch.FirstOfwidth);"
+
+                Set rs = db.OpenRecordset(sql_select, dbOpenDynaset)
+
+                rs.MoveFirst
+
+                DoCmd.SetWarnings False
+                Do While rs.EOF = False
+
+                    QUEUEID = DMax("QUEUEID", "QUEUE")
+                    QUEUEID = QUEUEID + 1
+
+
+                    'insert group into table
+                    sql = "insert into QUEUE (QUEUEID, QNAME) values ('" & QUEUEID & "','" & rs!batch_id & RemoveFullStop(rs!FirstOfFirstOfthickness) & rs!FirstOfFirstOfmaterial_type & rs!FirstOfFirstOflength & rs!FirstOfFirstOfWidth & "');"
+                    DoCmd.RunSQL sql
+
+
+                        'select for programs based on the group
+                        sql_select2 = "SELECT QUEUE.QUEUEID, QUEUE.QNAME, RemoveFullStop2(CStr([FirstOfthickness])) AS format_thickness, [batch_id] & [format_thickness] & [FirstOfmaterial_type] & [FirstOflength] & [FirstOfwidth] AS group2, qryFinnQNameFormat.FirstOfmaterial_type, qryFinnQNameFormat.FirstOfthickness, qryFinnQNameFormat.FirstOflength, qryFinnQNameFormat.FirstOfwidth, qryFinnQNameFormat.batch_id, qryFinnQNameFormat.program_no, qryFinnQNameFormat.FirstOfquantity " & _
+                            "FROM qryFinnQNameFormat INNER JOIN QUEUE ON qryFinnQNameFormat.group2 = QUEUE.QNAME GROUP BY QUEUE.QUEUEID, QUEUE.QNAME, RemoveFullStop2(CStr([FirstOfthickness])), qryFinnQNameFormat.FirstOfmaterial_type, qryFinnQNameFormat.FirstOfthickness, qryFinnQNameFormat.FirstOflength, qryFinnQNameFormat.FirstOfwidth, qryFinnQNameFormat.batch_id, qryFinnQNameFormat.program_no, qryFinnQNameFormat.FirstOfquantity HAVING (((QUEUE.QNAME)='" & rs!batch_id & RemoveFullStop(rs!FirstOfFirstOfthickness) & rs!FirstOfFirstOfmaterial_type & rs!FirstOfFirstOflength & rs!FirstOfFirstOfWidth & "'));"
+
+
+                        Set db = CurrentDb
+                        Set rs2 = db.OpenRecordset(sql_select2, dbOpenDynaset)
+
+
+                        PROGSEQNO = 0
+                        rs2.MoveFirst
+
+                        Do While rs2.EOF = False
+                            PROGSEQNO = PROGSEQNO + 1
+                           'inserts program_no into QUEUEPROG
+                           sql_insert = "INSERT into QUEUEPROG (QUEUEID, PROGSEQ, NCFILE, TOTALAMOUNT, THICKNESS) VALUES ('" & QUEUEID & "','" & PROGSEQNO & "','" & "Z:\" & rs2!program_no & ".NC" & "','" & rs2!FirstOfquantity & "','" & rs2!FirstOfthickness & "');"
+                           DoCmd.RunSQL sql_insert
+                           rs2.MoveNext
+                       Loop
+
+
+                    rs.MoveNext
+
+                Loop
+                DoCmd.SetWarnings True
+
+
+
+                *////////////////////////////////////////////////
                 conn.Close();
             }
         }
