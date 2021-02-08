@@ -15,7 +15,7 @@ namespace autoBatch
 
                      "Trusted_Connection=no;" +
 
-                     "database=order_database_paintdrop; " +
+                     "database=order_database; " +
 
                      "connection timeout=30";
 
