@@ -31,11 +31,11 @@ namespace autoBatch
             bufferWidth += 85;
             Console.BufferWidth = bufferWidth; //make the console app resizable  (bigger)
 
-      
+
 
             //autoWriteToFinn();
             //return;
-            string path = @"\\DESIGNSVR1\subcontracts\Express5.MAC\FINNPRODUCTION.csv";  //@"\\DESIGNSVR1\dropbox\FINNPRODUCTION_temp.csv"; 
+            string path = @"\\DESIGNSVR1\dropbox\FINNPRODUCTION_temp.csv";  //@"\\DESIGNSVR1\subcontracts\Express5.MAC\FINNPRODUCTION.csv";  //
             Microsoft.Office.Interop.Excel.Application xlApp = new Microsoft.Office.Interop.Excel.Application();
             Microsoft.Office.Interop.Excel.Workbook xlWorkbook = xlApp.Workbooks.Open(path);
             Microsoft.Office.Interop.Excel.Worksheet xlWorksheet = xlWorkbook.Sheets[1]; // assume it is the first sheet
@@ -52,8 +52,8 @@ namespace autoBatch
                 conn.Open();
                 //delete entried in that table here?
                 sql = "DELETE FROM dbo.auto_batch_finn_csv_import ";
-                using (SqlCommand cmd = new SqlCommand(sql, conn))
-                    cmd.ExecuteNonQuery();
+                //////////using (SqlCommand cmd = new SqlCommand(sql, conn))
+                //////////cmd.ExecuteNonQuery();
                 for (int i = 1; i < 500; i++)  //for (int i = 1; i < last; i++)      //for X amount of rows in the excel sheet
                 {
                     double temp = 0;
@@ -77,8 +77,8 @@ namespace autoBatch
                    xlRange.Cells[i, 7].Value2.ToString() + ",'" +//quantity
                    xlRange.Cells[i, 8].Value2.ToString() + "','" +//date
                    xlRange.Cells[i, 9].Value2.ToString() + "')";//machine
-                    using (SqlCommand cmd = new SqlCommand(sql, conn))
-                        cmd.ExecuteNonQuery();
+                    //////////////using (SqlCommand cmd = new SqlCommand(sql, conn))
+                    //////////////    cmd.ExecuteNonQuery();
                     Console.WriteLine("row: " + i.ToString() + " inserted :}");
 
                     //if (xlRange.Cells[i, 1].Value2 != null)
@@ -175,7 +175,7 @@ namespace autoBatch
                 {
                     Console.WriteLine("Already max number of doors batching... press any key to exit "); //will need to remove all of these by the time we publish it! :}
                     Console.ReadLine();
-                    Environment.Exit(-1); //exit out of the app~
+                    Environment.Exit(-1); // exit out of the app
                 }
                 //before starting the batch we need to double check some doors have been seleted incase the procedure found none
                 sql = "SELECT top 1 ID FROM dbo.auto_batch_selected_door";
@@ -234,8 +234,8 @@ namespace autoBatch
                 using (SqlCommand cmd = new SqlCommand(sql, conn))
                     batchTemp = Convert.ToInt32(cmd.ExecuteScalar());
                 rotecSGBatchID = batchTemp;
-                rotecNonSGBatchID = batchTemp + 1;  //12321
-                SGBatchID = batchTemp + 2;
+                rotecNonSGBatchID = batchTemp + 1;  //add one per type so we get a unique id for all of these, although this will prob bug out if another person batches at the exact same time -- should probably adjust for this ~
+                SGBatchID = batchTemp + 2; 
                 NonSGBatchID = batchTemp + 3;
 
                 int temp = 0;
@@ -381,8 +381,7 @@ namespace autoBatch
                     sql = "SELECT MAX(batch_id) + 1 FROM dbo.batch";
                     using (SqlCommand cmd = new SqlCommand(sql, conn))
                         batch_id = Convert.ToInt32(cmd.ExecuteScalar());
-                    //^^ this needs to be removed 
-
+                    //^^ this needs to be removed  but for now i just overwrite it below~
 
 
                     //grouping
@@ -482,10 +481,10 @@ namespace autoBatch
             ////////////////////////////////////////////////
             //xml variables
             List<string> groupingList = new List<string>(); //this is used for stopping double entries, same as above
-            string PathName = "";
+            string PathName = ""; //most of these are not used
             string progName = "";
             int FinishedNumber = 0;
-            int TargetNumber = 0;
+            int TargetNumber = 0; 
             string StartMode = "";
             string Sheet = "";
             int SheetMNUM = 0;
@@ -583,7 +582,7 @@ namespace autoBatch
                     {
                         groupingList.Add(grouping); //dont enter this path again for this grouping 
 
-                        string path = @"\\YWSKPC\JobList\" + grouping + @".xml"; //@"//DESIGNSVR100\dropbox\xml\" + grouping + @".xml";  //  
+                        string path = @"//DESIGNSVR1\dropbox\xml\" + grouping + @".xml";  //  @"\\YWSKPC\JobList\" + grouping + @".xml"; //
                         try
                         {
                             if (!File.Exists(path))
@@ -595,22 +594,22 @@ namespace autoBatch
                                     sw.Close();
                                 }
                             }
-                    }
+                        }
                         catch
-                    {
-                        path = @"//DESIGNSVR1\dropbox\IT_FAILED\XML\" + grouping + @".xml";
-                        if (!File.Exists(path))
                         {
-                            using (StreamWriter sw = File.CreateText(path))
+                            path = @"//DESIGNSVR1\dropbox\IT_FAILED\XML\" + grouping + @".xml";
+                            if (!File.Exists(path))
                             {
-                                sw.WriteLine("<?xml version= \"1.0\" encoding=\"utf-8\" standalone=\"yes\"?>");
-                                sw.WriteLine("<JobList>");
-                                sw.Close();
+                                using (StreamWriter sw = File.CreateText(path))
+                                {
+                                    sw.WriteLine("<?xml version= \"1.0\" encoding=\"utf-8\" standalone=\"yes\"?>");
+                                    sw.WriteLine("<JobList>");
+                                    sw.Close();
+                                }
                             }
                         }
-                    }
 
-                    using (var writer = new StreamWriter(path, true))
+                        using (var writer = new StreamWriter(path, true))
                         {
 
                             Console.WriteLine(sql);
@@ -630,6 +629,20 @@ namespace autoBatch
                                 da.Fill(finnBatchDT);
                             }
                             //fullSheetName = rs_rainer!group
+
+                            /////////////////////////////////////////////////////////////////
+                            string rowData = "";
+                            foreach (DataRow row in finnBatchDT.Rows)
+                            {
+                                foreach (DataColumn col in finnBatchDT.Columns)
+                                {
+                                    rowData = rowData + row[col].ToString() + " -- ";
+                                }
+                                Console.WriteLine(rowData);
+                                rowData = "";
+                            }
+                            /////////////////////////////////////////////////////////////////
+                            ///
                             string LString = "";
                             string[] LArray;
 
