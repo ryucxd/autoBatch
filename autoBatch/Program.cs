@@ -23,6 +23,7 @@ namespace autoBatch
         {
             int bufferHeight = Console.BufferHeight;
             int bufferWidth = Console.BufferWidth;
+            string sql = "";
 
 
             //bufferHeight += 240;
@@ -31,11 +32,28 @@ namespace autoBatch
             bufferWidth += 85;
             Console.BufferWidth = bufferWidth; //make the console app resizable  (bigger)
 
+            //first thing to handle is to check if there is enough doors to batch at all!
+            using (SqlConnection conn = new SqlConnection(CONNECT.ConnectionString))
+            {
+                conn.Open();
+                int minDoors = 0;
+                int currentDoors = 0;
+                sql = "SELECT minimum_doors from dbo.auto_batch_limit";
+                using (SqlCommand cmd = new SqlCommand(sql, conn))
+                    minDoors = Convert.ToInt32(cmd.ExecuteScalar());
+                sql = "select count(a.id) as [count] from dbo.door a LEFT JOIN dbo.door_program b ON a.id = b.door_id LEFT JOIN dbo.door_type c ON a.door_type_id = c.id " +
+                    "WHERE b.checked_by_id is not null AND batched<> -1 AND date_punch > '2020-06-01' AND(status_id = 1 or status_id = 2) AND(c.id <> 43 OR c.id <> 11  OR c.id <> 123  OR c.id <> 124  OR c.id <> 125  OR c.id <> 140  OR c.id <> 150  OR c.id <> 151)";
+                using (SqlCommand cmd = new SqlCommand(sql, conn))
+                    currentDoors = Convert.ToInt32(cmd.ExecuteScalar());
 
+                conn.Close();
+                if (currentDoors < minDoors) //theres not enough doors to batch  so exit
+                    return;
+            }
 
             //autoWriteToFinn();
             //return;
-            string path = @"\\DESIGNSVR1\dropbox\FINNPRODUCTION_temp.csv";  //@"\\DESIGNSVR1\subcontracts\Express5.MAC\FINNPRODUCTION.csv";  //
+            string path = @"\\DESIGNSVR1\subcontracts\Express5.MAC\FINNPRODUCTION.csv";  //@"\\DESIGNSVR1\dropbox\FINNPRODUCTION_temp.csv";  //
             Microsoft.Office.Interop.Excel.Application xlApp = new Microsoft.Office.Interop.Excel.Application();
             Microsoft.Office.Interop.Excel.Workbook xlWorkbook = xlApp.Workbooks.Open(path);
             Microsoft.Office.Interop.Excel.Worksheet xlWorksheet = xlWorkbook.Sheets[1]; // assume it is the first sheet
@@ -44,49 +62,49 @@ namespace autoBatch
             int numberOfColumnsToRead = value;
             int last = xlWorksheet.Cells.SpecialCells(Microsoft.Office.Interop.Excel.XlCellType.xlCellTypeLastCell, Type.Missing).Row;
             Microsoft.Office.Interop.Excel.Range range = xlWorksheet.get_Range("A1:A" + last);
-            string sql = "";
-
-
+            
             using (SqlConnection conn = new SqlConnection(CONNECT.ConnectionString))
             {
                 conn.Open();
                 //delete entried in that table here?
                 sql = "DELETE FROM dbo.auto_batch_finn_csv_import ";
-                //////////using (SqlCommand cmd = new SqlCommand(sql, conn))
-                //////////cmd.ExecuteNonQuery();
-                for (int i = 1; i < 500; i++)  //for (int i = 1; i < last; i++)      //for X amount of rows in the excel sheet
-                {
-                    double temp = 0;
-                    if (xlRange.Cells[i, 1].Value2 != null)
+                using (SqlCommand cmd = new SqlCommand(sql, conn))
+                    cmd.ExecuteNonQuery();
+                sql = "DELETE FROM dbo.auto_batch_selected_door"; //wipe the old selected list here too! ~
+                using (SqlCommand cmd = new SqlCommand(sql, conn))
+                    cmd.ExecuteNonQuery();
+                    for (int i = 1; i < 500; i++)  //for (int i = 1; i < last; i++)      //for X amount of rows in the excel sheet
                     {
-                        string charCheck = Convert.ToString(xlRange.Cells[i, 1].Value2);
-                        if (charCheck.All(char.IsDigit))// if (System.Text.RegularExpressions.Regex.IsMatch(charCheck, @"^[a-zA-Z]+$") == false)
-                            temp = xlRange.Cells[i, 1].Value2;
+                        double temp = 0;
+                        if (xlRange.Cells[i, 1].Value2 != null)
+                        {
+                            string charCheck = Convert.ToString(xlRange.Cells[i, 1].Value2);
+                            if (charCheck.All(char.IsDigit))// if (System.Text.RegularExpressions.Regex.IsMatch(charCheck, @"^[a-zA-Z]+$") == false)
+                                temp = xlRange.Cells[i, 1].Value2;
+                        }
+                        //remove the space from the start of material here 
+                        string tempString = xlRange.Cells[i, 3].Value2.ToString();
+                        tempString = tempString.Trim();  //remove the leading spaces in material (for some reason there is white space at start of it in the csv by default
+
+                        sql = "INSERT INTO dbo.auto_batch_finn_csv_import (door_id,program_id,material,thickness,length,width,quantity,date,machine) VALUES (" +
+                       temp + ",'" + //door id
+                       xlRange.Cells[i, 2].Value2.ToString() + "','" +//program id
+                       tempString + "'," +//material (with absouletly no leading or trailing white spaces!!! :DDD 
+                       xlRange.Cells[i, 4].Value2.ToString() + "," +//thickness
+                       xlRange.Cells[i, 5].Value2.ToString() + "," +//length
+                       xlRange.Cells[i, 6].Value2.ToString() + "," +//width
+                       xlRange.Cells[i, 7].Value2.ToString() + ",'" +//quantity
+                       xlRange.Cells[i, 8].Value2.ToString() + "','" +//date
+                       xlRange.Cells[i, 9].Value2.ToString() + "')";//machine
+                        using (SqlCommand cmd = new SqlCommand(sql, conn))
+                            cmd.ExecuteNonQuery();
+                        Console.WriteLine("row: " + i.ToString() + " inserted :}");
+
+                        //if (xlRange.Cells[i, 1].Value2 != null)
+                        //    Console.WriteLine(xlRange.Cells[i, 1].Value2.ToString()); // do whatever with value
                     }
-                    //remove the space from the start of material here 
-                    string tempString = xlRange.Cells[i, 3].Value2.ToString();
-                    tempString = tempString.Trim();  //remove the leading spaces in material (for some reason there is white space at start of it in the csv by default
-
-                    sql = "INSERT INTO dbo.auto_batch_finn_csv_import (door_id,program_id,material,thickness,length,width,quantity,date,machine) VALUES (" +
-                   temp + ",'" + //door id
-                   xlRange.Cells[i, 2].Value2.ToString() + "','" +//program id
-                   tempString + "'," +//material (with absouletly no leading or trailing white spaces!!! :DDD 
-                   xlRange.Cells[i, 4].Value2.ToString() + "," +//thickness
-                   xlRange.Cells[i, 5].Value2.ToString() + "," +//length
-                   xlRange.Cells[i, 6].Value2.ToString() + "," +//width
-                   xlRange.Cells[i, 7].Value2.ToString() + ",'" +//quantity
-                   xlRange.Cells[i, 8].Value2.ToString() + "','" +//date
-                   xlRange.Cells[i, 9].Value2.ToString() + "')";//machine
-                    //////////////using (SqlCommand cmd = new SqlCommand(sql, conn))
-                    //////////////    cmd.ExecuteNonQuery();
-                    Console.WriteLine("row: " + i.ToString() + " inserted :}");
-
-                    //if (xlRange.Cells[i, 1].Value2 != null)
-                    //    Console.WriteLine(xlRange.Cells[i, 1].Value2.ToString()); // do whatever with value
-                }
                 conn.Close();
             }
-
 
             xlWorkbook.Close(0);
             xlApp.Quit(); //this isnt enough to properly close the app... 
@@ -99,7 +117,7 @@ namespace autoBatch
                 {
                     try
                     {
-                        p.Kill(); //
+                        p.Kill(); //kills each process :}
                     }
                     catch { }
                 }
@@ -124,9 +142,9 @@ namespace autoBatch
                         limit = Convert.ToInt32(row["limit"].ToString());
                     }
                 }
-                if (current_number < limit) //i think this section needs to add one onto the current number
+                if (current_number + 1 < limit) //i think this section needs to add one onto the current number
                 {
-                    while (current_number < limit)
+                    while (current_number + 1 < limit)
                     {
                         //run auto_batch_master  and then check for new limit x current
                         using (SqlCommand cmdUSP = new SqlCommand("auto_batch_master", conn))
@@ -235,7 +253,7 @@ namespace autoBatch
                     batchTemp = Convert.ToInt32(cmd.ExecuteScalar());
                 rotecSGBatchID = batchTemp;
                 rotecNonSGBatchID = batchTemp + 1;  //add one per type so we get a unique id for all of these, although this will prob bug out if another person batches at the exact same time -- should probably adjust for this ~
-                SGBatchID = batchTemp + 2; 
+                SGBatchID = batchTemp + 2;
                 NonSGBatchID = batchTemp + 3;
 
                 int temp = 0;
@@ -341,7 +359,7 @@ namespace autoBatch
             }
         }
 
-        private static void WriteToPunchProgQ()  //break point ALL of this  -- grouping list is preventing them from going through
+        private static void WriteToPunchProgQ()
         {
             //check if there is anything for the finn
             List<string> groupingList = new List<string>();   //add each grouping to the list so we can check for doubles (each loop adds for every line item so we only need to run once per grouping)
@@ -484,7 +502,7 @@ namespace autoBatch
             string PathName = ""; //most of these are not used
             string progName = "";
             int FinishedNumber = 0;
-            int TargetNumber = 0; 
+            int TargetNumber = 0;
             string StartMode = "";
             string Sheet = "";
             int SheetMNUM = 0;
@@ -506,11 +524,12 @@ namespace autoBatch
                 {
                     SqlDataAdapter da = new SqlDataAdapter(cmd);
                     da.Fill(dt);
-                    temp = Convert.ToInt32(dt.Rows[0][0].ToString());
+                    if (dt.Rows.Count > 1)
+                        temp = Convert.ToInt32(dt.Rows[0][0].ToString());
+                    else temp = 0;
                 }
                 if (temp == 0)
                     return; //there is nothing for the finn
-
             }
 
 
@@ -529,7 +548,10 @@ namespace autoBatch
                 {
                     SqlDataAdapter da = new SqlDataAdapter(cmd);
                     da.Fill(dt);
-                    temp = Convert.ToInt32(dt.Rows[0][0].ToString());
+                    if (dt.Rows.Count > 1)
+                        temp = Convert.ToInt32(dt.Rows[0][0].ToString());
+                    else
+                        temp = 0;
                 }
                 if (temp == 0)
                     return; //there is nothing for the finn
@@ -541,15 +563,6 @@ namespace autoBatch
                     batch_id = Convert.ToInt32(cmd.ExecuteScalar());
 
 
-
-                if (dt.Rows[0][10].ToString() == "SG")
-                    batch_id = SGBatchID;
-                else if (dt.Rows[0][10].ToString() == "NonSG")
-                    batch_id = NonSGBatchID;
-                else if (dt.Rows[0][10].ToString() == "RotecNonSG")
-                    batch_id = rotecNonSGBatchID;
-                else if (dt.Rows[0][10].ToString() == "RotecSG")
-                    batch_id = rotecSGBatchID;
                 //12321
 
                 //loop here for EACH program number of EACH door that needs to be batched
@@ -565,6 +578,14 @@ namespace autoBatch
                     using (SqlCommand cmd = new SqlCommand(sql, conn))
                         grouping = Convert.ToString(cmd.ExecuteScalar());
                     //batchheader
+                    if (dt.Rows[0][10].ToString() == "SG")
+                        batch_id = SGBatchID;
+                    else if (dt.Rows[0][10].ToString() == "NonSG")
+                        batch_id = NonSGBatchID;
+                    else if (dt.Rows[0][10].ToString() == "RotecNonSG")
+                        batch_id = rotecNonSGBatchID;
+                    else if (dt.Rows[0][10].ToString() == "RotecSG")
+                        batch_id = rotecSGBatchID;
                     sql = "insert into dbo.batch_header (qid, qname, datecreated, machine) values ('" + batch_id + "','" + grouping.ToString() + "','" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "','RAINER');";
                     if (grouping.Length < 2)
                     {
@@ -582,7 +603,7 @@ namespace autoBatch
                     {
                         groupingList.Add(grouping); //dont enter this path again for this grouping 
 
-                        string path = @"//DESIGNSVR1\dropbox\xml\" + grouping + @".xml";  //  @"\\YWSKPC\JobList\" + grouping + @".xml"; //
+                        string path =  @"\\YWSKPC\JobList\" + grouping + @".xml"; //@"//DESIGNSVR1\dropbox\xml\" + grouping + @".xml";  //
                         try
                         {
                             if (!File.Exists(path))
@@ -621,7 +642,7 @@ namespace autoBatch
                             sql = "SELECT dbo.batch_header.id, dbo.batch_header.qid, dbo.batch_header.qname, auto_batch_rainer_batch.program_id, auto_batch_rainer_batch.FirstOfquantity, auto_batch_rainer_batch.door_id " +
                                 "FROM auto_batch_rainer_batch " +
                                 "INNER JOIN dbo.batch_header ON auto_batch_rainer_batch.[group] = dbo.batch_header.qname " +
-                                "WHERE [group] = '" + grouping + "' " +
+                                "WHERE [group] = '" + grouping + "' AND machine = 'rainer' " +
                                 "GROUP BY dbo.batch_header.id, dbo.batch_header.qid, dbo.batch_header.qname, auto_batch_rainer_batch.program_id, auto_batch_rainer_batch.FirstOfquantity, auto_batch_rainer_batch.door_id";
                             using (SqlCommand cmd = new SqlCommand(sql, conn))
                             {
@@ -642,7 +663,6 @@ namespace autoBatch
                                 rowData = "";
                             }
                             /////////////////////////////////////////////////////////////////
-                            ///
                             string LString = "";
                             string[] LArray;
 
@@ -683,7 +703,7 @@ namespace autoBatch
                                 writer.Write(@"<PathName>Z:\" + finnBatchDT.Rows[row][3].ToString() + ".MPF</PathName>" + Environment.NewLine);  //need to check the file type here 
                                 writer.Write("<Name>" + finnBatchDT.Rows[row][3].ToString() + ".MPF</Name>" + Environment.NewLine);
                                 writer.Write("<FinishedNumber>0</FinishedNumber>" + Environment.NewLine);  //always 0 ??
-                                writer.Write("<TargetNumber>" + TargetNumber + "</TargetNumber>" + Environment.NewLine);
+                                writer.Write("<TargetNumber>" + finnBatchDT.Rows[row][4].ToString() + "</TargetNumber>" + Environment.NewLine);
                                 writer.Write("<StartMode>A</StartMode>" + Environment.NewLine); //always A?
                                 writer.Write("<Sheet>" + Sheet + "</Sheet>" + Environment.NewLine);
                                 writer.Write("<SheetMNUM>" + SheetMNUM + "</SheetMNUM>" + Environment.NewLine);
@@ -718,10 +738,10 @@ namespace autoBatch
 
         private static void autoWriteToFinn() //this wrtes to the table thats on the finn -
         {
-            return;
+
             string sql = "";
-            DataTable dtBatchIdList = new DataTable();
             DataTable dtDoorList = new DataTable();
+            DataTable dtGroupList = new DataTable();
             using (SqlConnection conn = new SqlConnection(CONNECT.ConnectionString))
             {
                 conn.Open();
@@ -732,25 +752,62 @@ namespace autoBatch
                 {
                     SqlDataAdapter da = new SqlDataAdapter(cmd);
                     da.Fill(dt);
-                    temp = Convert.ToInt32(dt.Rows[0][0].ToString());
+                    if (dt.Rows.Count > 1)
+                        temp = Convert.ToInt32(dt.Rows[0][0].ToString());
+                    else temp = 0;
                 }
                 if (temp == 0)
                     return; //there is nothing for the finn
 
-                sql = "select distinct max(batch_id) as batch_id,max(door_id) as door_id,max(program_id) as program_id,max(FirstOfMaterial_type) as FirstOfMaterial_type," +
-                    "max(FirstOfthickness) as FirstOfthickness,max(FirstOflength) as FirstOflength,max(FirstOfwidth) as FirstOfwidth,max(FirstOfquantity) as FirstOfquantity,max(FirstOfmachine) as FirstOfmachine," +
-                    "max([group]) as [group],max(batch_date) as batch_date,max(part_batched) as part_batched,max(offcut) as offcut " +
-                    "from dbo.auto_batch_finn_batch where FirstOfmachine = 'FINN-POWER' group by batch_id "; //loop through each of the doors (then loop through each of the program_ids on that foor
+                sql = "select[group] from dbo.auto_batch_finn_batch where FirstOfmachine = 'FINN-POWER' group by [group]"; //loop each of the groups
                 using (SqlCommand cmd = new SqlCommand(sql, conn))
                 {
                     SqlDataAdapter da = new SqlDataAdapter(cmd);
-                    da.Fill(dtDoorList);
+                    da.Fill(dtGroupList);
                 }
-                for (int rowCount = 0; rowCount < dtDoorList.Rows.Count; rowCount++)
+
+                /////////////////////////////////////////////////////////////////
+                string rowData = "";
+                foreach (DataRow row in dtGroupList.Rows)
                 {
+                    foreach (DataColumn col in dtGroupList.Columns)
+                    {
+                        rowData = rowData + row[col].ToString() + " -- ";
+                    }
+                    Console.WriteLine(rowData);
+                    rowData = "";
+                }
+                /////////////////////////////////////////////////////////////////
+
+
+
+                for (int rowCount = 0; rowCount < dtGroupList.Rows.Count; rowCount++) //for every group ----
+                {
+                    //we now need to gather data based on the group!
+                    sql = "select distinct * from dbo.auto_batch_finn_batch where FirstOfmachine = 'FINN-POWER' AND [group] = '" + dtGroupList.Rows[rowCount][0].ToString() + "' order by program_id ";
+                    using (SqlCommand cmd = new SqlCommand(sql, conn))
+                    {
+                        SqlDataAdapter da = new SqlDataAdapter(cmd);
+                        da.Fill(dtDoorList);
+                    }
+                    Console.WriteLine("-------------------------------------------------");
+                    /////////////////////////////////////////////////////////////////
+                    rowData = "";
+                    foreach (DataRow row in dtDoorList.Rows)
+                    {
+                        foreach (DataColumn col in dtDoorList.Columns)
+                        {
+                            rowData = rowData + row[col].ToString() + " -- ";
+                        }
+                        Console.WriteLine(rowData);
+                        rowData = "";
+                    }
+                    /////////////////////////////////////////////////////////////////
+
+
                     Console.WriteLine("-------------------------------------------------");
                     int queue = 0;
-                    OleDbConnection connection = new OleDbConnection(@"Provider=Microsoft.ACE.OLEDB.12.0;Data Source=" + @"\\fujitsu\fp\production.mdb"); //writes to the file on finn //\\designsvr1\DropBox\production.mdb   // @"\\designsvr1\DropBox\production.mdb");//
+                    OleDbConnection connection = new OleDbConnection(@"Provider=Microsoft.ACE.OLEDB.12.0;Data Source=" + @"\\fujitsu\fp\production.mdb"); //writes to the file on finn //\\designsvr1\DropBox\production.mdb   // @"\\designsvr1\DropBox\production.mdb");//  \\fujitsu\fp\production.mdb
                     connection.Open();
                     OleDbDataReader reader = null;
                     OleDbCommand command = new OleDbCommand("SELECT MAX (QUEUEID) FROM QUEUE ", connection);
@@ -762,26 +819,22 @@ namespace autoBatch
                     }
 
                     //insert into queue
-                    sql = "insert into QUEUE (QUEUEID, QNAME) values ('" + queue + "','" + dtDoorList.Rows[rowCount][9] + "')";
+                    string groupTrim = dtGroupList.Rows[rowCount][0].ToString();
+                    groupTrim = groupTrim.Replace(" ", "");
+                    groupTrim = groupTrim.Replace(".", "");
+                    sql = "insert into QUEUE (QUEUEID, QNAME) values ('" + queue + "','" + groupTrim + "')"; //unique id per grouping
+                    Console.WriteLine(sql);
+                    Console.WriteLine("-------------------------------------------------");
                     OleDbCommand cmd2 = new OleDbCommand(sql, connection);
                     cmd2.ExecuteNonQuery();
 
 
-                    sql = "select distinct * from dbo.auto_batch_finn_batch where FirstOfmachine = 'FINN-POWER' AND door_id = " + dtDoorList.Rows[rowCount][1].ToString() + " order by program_id ";
-                    using (SqlCommand cmd = new SqlCommand(sql, conn))
-                    {
-                        SqlDataAdapter da = new SqlDataAdapter(cmd);
-                        da.Fill(dtBatchIdList);
-                    }
-
-
-
                     //now we loop through the DT
                     //needs to have access to the finn
-                    int progressQNumber = 0;
-                    for (int row = 0; row < dtBatchIdList.Rows.Count; row++)
+                    int progressQNumber = 1;
+                    for (int row = 0; row < dtDoorList.Rows.Count; row++)
                     {
-                        sql = "INSERT into QUEUEPROG (QUEUEID, PROGSEQ, NCFILE, TOTALAMOUNT, THICKNESS) VALUES ('" + queue + "','" + progressQNumber.ToString() + "','" + @"Z:\" + dtBatchIdList.Rows[row][2].ToString() + ".NC" + "','" + dtBatchIdList.Rows[row][7].ToString() + "','" + dtBatchIdList.Rows[row][4].ToString() + "');";
+                        sql = "INSERT into QUEUEPROG (QUEUEID, PROGSEQ, NCFILE, TOTALAMOUNT, THICKNESS) VALUES ('" + queue + "','" + progressQNumber.ToString() + "','" + @"Z:\" + dtDoorList.Rows[row][2].ToString() + ".NC" + "','" + dtDoorList.Rows[row][7].ToString() + "','" + dtDoorList.Rows[row][4].ToString() + "');";
                         OleDbCommand cmd = new OleDbCommand(sql, connection);
                         cmd.ExecuteNonQuery();
                         progressQNumber = progressQNumber + 1;
@@ -789,7 +842,10 @@ namespace autoBatch
 
                         //queue = queue + 1;   
                     }
-                    dtBatchIdList.Clear();
+                    dtDoorList.Clear();
+                    connection.Close();
+                    Console.WriteLine("-------------------------------------------------");
+                    Console.WriteLine("-------------------------------------------------");
                 }
 
                 /*//////////////////////////////////////////////// 
@@ -837,6 +893,7 @@ namespace autoBatch
 
 
                 *////////////////////////////////////////////////
+
                 conn.Close();
             }
         }
@@ -864,7 +921,7 @@ namespace autoBatch
         private static void moveXML()
         {
             //try and move old xmls here IF they exist
-            string sourceDirectory = @"//DESIGNSVR1\dropbox\IT_FAILED\XML";
+            string sourceDirectory = @"//DESIGNSVR1\dropbop\xml";
             string destinationDirectory = @"//DESIGNSVR1\dropbox\IT_FAILED\moved_xml";
 
             try
