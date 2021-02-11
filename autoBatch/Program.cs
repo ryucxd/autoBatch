@@ -70,7 +70,7 @@ namespace autoBatch
                 sql = "DELETE FROM dbo.auto_batch_finn_csv_import ";
                 using (SqlCommand cmd = new SqlCommand(sql, conn))
                     cmd.ExecuteNonQuery();
-                sql = "DELETE FROM dbo.auto_batch_selected_door"; //wipe the old selected list here too! ~
+                sql = "DELETE FROM dbo.auto_batch_selected_door"; //wipe the old selected list here too! otherwise we won't get anywhere~
                 using (SqlCommand cmd = new SqlCommand(sql, conn))
                     cmd.ExecuteNonQuery();
                     for (int i = 1; i < 500; i++)  //for (int i = 1; i < last; i++)      //for X amount of rows in the excel sheet
