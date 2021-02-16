@@ -909,7 +909,7 @@ namespace autoBatch
 
 
 
-            processInfo = new System.Diagnostics.ProcessStartInfo(@"\\DESIGNSVR1\dropbox\IT_FAILED\auto_batch_print.bat");
+            processInfo = new System.Diagnostics.ProcessStartInfo(@"\\DESIGNSVR1\dropbox\IT_FAILED\auto_batch_print.bat"); //this opens the app fine
             processInfo.CreateNoWindow = true;
             processInfo.UseShellExecute = false;
             process = System.Diagnostics.Process.Start(processInfo);
