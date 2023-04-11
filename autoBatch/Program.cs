@@ -15,10 +15,11 @@ namespace autoBatch
     {
         public int _current_number { get; set; }
         public int _limit { get; set; }
-        public static int rotecSGBatchID { get; set; }
-        public static int rotecNonSGBatchID { get; set; }
-        public static int SGBatchID { get; set; }
-        public static int NonSGBatchID { get; set; }
+        //public static int rotecSGBatchID { get; set; }
+        //public static int rotecNonSGBatchID { get; set; }
+        //public static int SGBatchID { get; set; }
+        //public static int NonSGBatchID { get; set; }
+        public static int AllBatchID { get; set; }
         static void Main(string[] args)
         {
             int bufferHeight = Console.BufferHeight;
@@ -36,19 +37,106 @@ namespace autoBatch
             using (SqlConnection conn = new SqlConnection(CONNECT.ConnectionString))
             {
                 conn.Open();
-                int minDoors = 0;
-                int currentDoors = 0;
-                sql = "SELECT minimum_doors from dbo.auto_batch_limit";
-                using (SqlCommand cmd = new SqlCommand(sql, conn))
-                    minDoors = Convert.ToInt32(cmd.ExecuteScalar());
-                sql = "select count(a.id) as [count] from dbo.door a LEFT JOIN dbo.door_program b ON a.id = b.door_id LEFT JOIN dbo.door_type c ON a.door_type_id = c.id " +
-                    "WHERE b.checked_by_id is not null AND batched<> -1 AND date_punch > '2020-06-01' AND(status_id = 1 or status_id = 2) AND(c.id <> 43 OR c.id <> 11  OR c.id <> 123  OR c.id <> 124  OR c.id <> 125  OR c.id <> 140  OR c.id <> 150  OR c.id <> 151)";
-                using (SqlCommand cmd = new SqlCommand(sql, conn))
-                    currentDoors = Convert.ToInt32(cmd.ExecuteScalar());
 
-                conn.Close();
-                if (currentDoors < minDoors) //theres not enough doors to batch  so exit
-                    return;
+                int i = 0;
+                DateTime min_date_punch;
+                int doors_available = 0;
+                int total_doors_for_min_date_punch = 0;
+
+                sql = "SELECT dbo.func_work_days(GETDATE(),0)";
+                using (SqlCommand cmd = new SqlCommand(sql, conn))
+                    min_date_punch = Convert.ToDateTime(cmd.ExecuteScalar());
+
+                Console.WriteLine("-------------------");
+                while (i < 3)
+                {
+                    //first up we get the closest date punch
+                    sql = "select MIN(date_punch)  from dbo.door a " +
+                        "LEFT JOIN dbo.door_program b ON a.id = b.door_id " +
+                        "LEFT JOIN dbo.door_type c ON a.door_type_id = c.id " +
+                        "WHERE (batched = 0 or batched is null) and (complete_punch = 0 or complete_punch is null) " +
+                        "AND date_punch > '2020-06-01' AND (status_id = 1 or status_id = 2) " +
+                        "AND (c.id <> 43 OR c.id <> 11  OR c.id <> 123  OR c.id <> 124  OR c.id <> 125  OR c.id <> 140  OR c.id <> 150  OR c.id <> 151 ) " +
+                        "and (a.id > 100000) and date_punch > '" + min_date_punch.ToString("yyyyMMdd") + "' ";
+
+                    using (SqlCommand cmd = new SqlCommand(sql, conn))
+                        min_date_punch = (DateTime)cmd.ExecuteScalar();
+
+                    //get the doors available
+                    sql = "SELECT count(a.id) from dbo.door a " +
+                        "LEFT JOIN dbo.door_program b ON a.id = b.door_id " +
+                        "LEFT JOIN dbo.door_type c ON a.door_type_id = c.id " +
+                        "WHERE b.checked_by_id is not null AND (batched = 0 or batched is null) and (complete_punch = 0 or complete_punch is null) " +
+                        "AND date_punch > '2020-06-01' AND (status_id = 1 or status_id = 2)  " +
+                        "AND (c.id <> 43 OR c.id <> 11  OR c.id <> 123  OR c.id <> 124  OR c.id <> 125  OR c.id <> 140  OR c.id <> 150  OR c.id <> 151 ) " +
+                        "and (a.id > 100000  ) " +
+                        "AND date_punch = '" + min_date_punch.ToString("yyyyMMdd") + "' ";
+
+                    using (SqlCommand cmd = new SqlCommand(sql, conn))
+                        doors_available = Convert.ToInt32(cmd.ExecuteScalar());
+
+                    sql = "SELECT count(a.id) from dbo.door a " +
+                        "LEFT JOIN dbo.door_program b ON a.id = b.door_id " +
+                        "LEFT JOIN dbo.door_type c ON a.door_type_id = c.id " +
+                        "WHERE (batched = 0 or batched is null) and (complete_punch = 0 or complete_punch is null) " +
+                        "AND date_punch > '2020-06-01' AND (status_id = 1 or status_id = 2)  " +
+                        "AND (c.id <> 43 OR c.id <> 11  OR c.id <> 123  OR c.id <> 124  OR c.id <> 125  OR c.id <> 140  OR c.id <> 150  OR c.id <> 151 ) " +
+                        "and (a.id > 100000  ) AND date_punch = '" + min_date_punch.ToString("yyyyMMdd") + "' ";
+
+                    using (SqlCommand cmd = new SqlCommand(sql, conn))
+                        total_doors_for_min_date_punch = Convert.ToInt32(cmd.ExecuteScalar());
+
+
+                    Console.WriteLine("Closest Punch Date: " + min_date_punch.ToString("dd/MM/yyyy"));
+                    Console.WriteLine("Total number of doors to batch on that day: " + total_doors_for_min_date_punch.ToString());
+                    Console.WriteLine("Total number of doors READY to batch: " + doors_available.ToString());
+
+                    if (doors_available < total_doors_for_min_date_punch)
+                    {
+                        //there is not a full day
+                        i++;
+                        Console.WriteLine(" ");
+                        Console.WriteLine("This day isnt full -> loop again");
+                        Console.WriteLine("-------------------");
+                    }
+                    else
+                    {
+                        Console.WriteLine(min_date_punch.ToString("dd/MM/yyyy") + " is ready to batch...");
+                        i = 99999;
+                    }
+
+                }
+                conn.Close()
+                    
+                    ;
+
+                if (i == 99999)
+                {
+                    Console.WriteLine("Press ENTER to batch all doors for " + min_date_punch.ToString("dd/MM/yyyy"));
+                    Console.ReadLine();
+                }
+                else
+                {
+                    Console.WriteLine("There are no full days within the next " + i.ToString() + " punch dates.");
+                    Console.ReadLine();
+                    Environment.Exit(0);
+                }
+
+                //vvv old code for checking batches
+                ////conn.Open();
+                ////int minDoors = 0;
+                ////int currentDoors = 0;
+                ////sql = "SELECT minimum_doors from dbo.auto_batch_limit";
+                ////using (SqlCommand cmd = new SqlCommand(sql, conn))
+                ////    minDoors = Convert.ToInt32(cmd.ExecuteScalar());
+                ////sql = "select count(a.id) as [count] from dbo.door a LEFT JOIN dbo.door_program b ON a.id = b.door_id LEFT JOIN dbo.door_type c ON a.door_type_id = c.id " +
+                ////    "WHERE b.checked_by_id is not null and (complete_punch = 0 or complete_punch is null) AND (batched = 0 or batched is null) AND date_punch > '2020-06-01' AND(status_id = 1 or status_id = 2) AND(c.id <> 43 OR c.id <> 11  OR c.id <> 123  OR c.id <> 124  OR c.id <> 125  OR c.id <> 140  OR c.id <> 150  OR c.id <> 151 or c.id <> 113) and a.id > 100000";
+                ////using (SqlCommand cmd = new SqlCommand(sql, conn))
+                ////    currentDoors = Convert.ToInt32(cmd.ExecuteScalar());
+
+                ////conn.Close();
+                ////if (currentDoors < minDoors) //theres not enough doors to batch  so exit
+                ////    return;
             }
 
             //autoWriteToFinn();
@@ -62,7 +150,7 @@ namespace autoBatch
             int numberOfColumnsToRead = value;
             int last = xlWorksheet.Cells.SpecialCells(Microsoft.Office.Interop.Excel.XlCellType.xlCellTypeLastCell, Type.Missing).Row;
             Microsoft.Office.Interop.Excel.Range range = xlWorksheet.get_Range("A1:A" + last);
-            
+
             using (SqlConnection conn = new SqlConnection(CONNECT.ConnectionString))
             {
                 conn.Open();
@@ -73,36 +161,36 @@ namespace autoBatch
                 sql = "DELETE FROM dbo.auto_batch_selected_door"; //wipe the old selected list here too! otherwise we won't get anywhere~
                 using (SqlCommand cmd = new SqlCommand(sql, conn))
                     cmd.ExecuteNonQuery();
-                    for (int i = 1; i < 500; i++)  //for (int i = 1; i < last; i++)      //for X amount of rows in the excel sheet
+                for (int i = 1; i < 500; i++)  //for (int i = 1; i < last; i++)      //for X amount of rows in the excel sheet
+                {
+                    double temp = 0;
+                    if (xlRange.Cells[i, 1].Value2 != null)
                     {
-                        double temp = 0;
-                        if (xlRange.Cells[i, 1].Value2 != null)
-                        {
-                            string charCheck = Convert.ToString(xlRange.Cells[i, 1].Value2);
-                            if (charCheck.All(char.IsDigit))// if (System.Text.RegularExpressions.Regex.IsMatch(charCheck, @"^[a-zA-Z]+$") == false)
-                                temp = xlRange.Cells[i, 1].Value2;
-                        }
-                        //remove the space from the start of material here 
-                        string tempString = xlRange.Cells[i, 3].Value2.ToString();
-                        tempString = tempString.Trim();  //remove the leading spaces in material (for some reason there is white space at start of it in the csv by default
-
-                        sql = "INSERT INTO dbo.auto_batch_finn_csv_import (door_id,program_id,material,thickness,length,width,quantity,date,machine) VALUES (" +
-                       temp + ",'" + //door id
-                       xlRange.Cells[i, 2].Value2.ToString() + "','" +//program id
-                       tempString + "'," +//material (with absouletly no leading or trailing white spaces!!! :DDD 
-                       xlRange.Cells[i, 4].Value2.ToString() + "," +//thickness
-                       xlRange.Cells[i, 5].Value2.ToString() + "," +//length
-                       xlRange.Cells[i, 6].Value2.ToString() + "," +//width
-                       xlRange.Cells[i, 7].Value2.ToString() + ",'" +//quantity
-                       xlRange.Cells[i, 8].Value2.ToString() + "','" +//date
-                       xlRange.Cells[i, 9].Value2.ToString() + "')";//machine
-                        using (SqlCommand cmd = new SqlCommand(sql, conn))
-                            cmd.ExecuteNonQuery();
-                        Console.WriteLine("row: " + i.ToString() + " inserted :}");
-
-                        //if (xlRange.Cells[i, 1].Value2 != null)
-                        //    Console.WriteLine(xlRange.Cells[i, 1].Value2.ToString()); // do whatever with value
+                        string charCheck = Convert.ToString(xlRange.Cells[i, 1].Value2);
+                        if (charCheck.All(char.IsDigit))// if (System.Text.RegularExpressions.Regex.IsMatch(charCheck, @"^[a-zA-Z]+$") == false)
+                            temp = xlRange.Cells[i, 1].Value2;
                     }
+                    //remove the space from the start of material here 
+                    string tempString = xlRange.Cells[i, 3].Value2.ToString();
+                    tempString = tempString.Trim();  //remove the leading spaces in material (for some reason there is white space at start of it in the csv by default
+
+                    sql = "INSERT INTO dbo.auto_batch_finn_csv_import (door_id,program_id,material,thickness,length,width,quantity,date,machine) VALUES (" +
+                   temp + ",'" + //door id
+                   xlRange.Cells[i, 2].Value2.ToString() + "','" +//program id
+                   tempString + "'," +//material (with absouletly no leading or trailing white spaces!!! :DDD 
+                   xlRange.Cells[i, 4].Value2.ToString() + "," +//thickness
+                   xlRange.Cells[i, 5].Value2.ToString() + "," +//length
+                   xlRange.Cells[i, 6].Value2.ToString() + "," +//width
+                   xlRange.Cells[i, 7].Value2.ToString() + ",'" +//quantity
+                   xlRange.Cells[i, 8].Value2.ToString() + "','" +//date
+                   xlRange.Cells[i, 9].Value2.ToString() + "')";//machine
+                    using (SqlCommand cmd = new SqlCommand(sql, conn))
+                        cmd.ExecuteNonQuery();
+                    Console.WriteLine("row: " + i.ToString() + " inserted :}");
+
+                    //if (xlRange.Cells[i, 1].Value2 != null)
+                    //    Console.WriteLine(xlRange.Cells[i, 1].Value2.ToString()); // do whatever with value
+                }
                 conn.Close();
             }
 
@@ -124,77 +212,20 @@ namespace autoBatch
             }
 
 
-            //at this point now we would run the sql procedure  
-            sql = "SELECT [current_batch_no],[limit] FROM dbo.auto_batch_limit";
+
+
             using (SqlConnection conn = new SqlConnection(CONNECT.ConnectionString))
             {
                 conn.Open();
-                int current_number = 0;
-                int limit = 0;
-                using (SqlCommand cmd = new SqlCommand(sql, conn)) //first up confirm that the current batch is < the limiter  //the limit is going an extra 1 somewhere below this
-                {
-                    SqlDataAdapter da = new SqlDataAdapter(cmd);
-                    DataTable dt = new DataTable();
-                    da.Fill(dt);
-                    foreach (DataRow row in dt.Rows)
-                    {
-                        current_number = Convert.ToInt32(row["current_batch_no"].ToString());
-                        limit = Convert.ToInt32(row["limit"].ToString());
-                    }
-                }
-                if (current_number + 1 < limit) //i think this section needs to add one onto the current number
-                {
-                    while (current_number + 1 < limit)
-                    {
-                        //run auto_batch_master  and then check for new limit x current
-                        using (SqlCommand cmdUSP = new SqlCommand("auto_batch_master", conn))
-                        {
-                            cmdUSP.CommandType = CommandType.StoredProcedure;
-                            cmdUSP.ExecuteNonQuery();
-                        }
-                        //here we need to check to see if the procedure has found any doors > none are found then stop running the procedure
 
-                        sql = "SELECT no_doors FROM dbo.auto_batch_limit";
-                        using (SqlCommand cmd = new SqlCommand(sql, conn))
-                        {
-                            int doorCount = Convert.ToInt32(cmd.ExecuteScalar());
-                            if (doorCount == -1) //there are NO more doors to batch so exit out
-                            {
-                                sql = "update dbo.auto_batch_limit SET no_doors = 0"; //set this back to 0 so that the next time it runs it doesnt hit it
-                                using (SqlCommand cmd2 = new SqlCommand(sql, conn))
-                                    cmd2.ExecuteScalar();
-                                current_number = 99999999;
-                                continue;
-                            }
-                        }
+                //run auto_batch_master  and then check for new limit x current
+                using (SqlCommand cmdUSP = new SqlCommand("auto_batch_master_2", conn))
+                {
+                    cmdUSP.CommandType = CommandType.StoredProcedure;
+                    cmdUSP.ExecuteNonQuery();
+                }
 
 
-                        sql = "SELECT [current_batch_no],[limit] FROM dbo.auto_batch_limit";
-                        using (SqlCommand cmd = new SqlCommand(sql, conn)) //lastly confirm that the current batch is still < the limiter
-                        {
-                            SqlDataAdapter da = new SqlDataAdapter(cmd);
-                            DataTable dt = new DataTable();
-                            da.Fill(dt);
-                            foreach (DataRow row in dt.Rows)
-                            {
-                                current_number = Convert.ToInt32(row["current_batch_no"].ToString());
-                                limit = Convert.ToInt32(row["limit"].ToString());
-                                Console.WriteLine("----");
-                                Console.WriteLine("Current batch list total number: " + current_number.ToString());
-                                Console.WriteLine("----");
-                            }
-                        }
-                        sql = "UPDATE dbo.auto_batch_limit SET current_batch_no = current_batch_no  + 1 ";
-                        using (SqlCommand cmdCurrentBatchNo = new SqlCommand(sql, conn))
-                            cmdCurrentBatchNo.ExecuteNonQuery();
-                    }
-                }
-                else
-                {
-                    Console.WriteLine("Already max number of doors batching... press any key to exit "); //will need to remove all of these by the time we publish it! :}
-                    Console.ReadLine();
-                    Environment.Exit(-1); // exit out of the app
-                }
                 //before starting the batch we need to double check some doors have been seleted incase the procedure found none
                 sql = "SELECT top 1 ID FROM dbo.auto_batch_selected_door";
                 int temp = 0;
@@ -251,10 +282,12 @@ namespace autoBatch
                 sql = "SELECT MAX(batch_id) + 1 FROM dbo.batch";
                 using (SqlCommand cmd = new SqlCommand(sql, conn))
                     batchTemp = Convert.ToInt32(cmd.ExecuteScalar());
-                rotecSGBatchID = batchTemp;
-                rotecNonSGBatchID = batchTemp + 1;  //add one per type so we get a unique id for all of these, although this will prob bug out if another person batches at the exact same time -- should probably adjust for this ~
-                SGBatchID = batchTemp + 2;
-                NonSGBatchID = batchTemp + 3;
+                //rotecSGBatchID = batchTemp;
+                //rotecNonSGBatchID = batchTemp + 1;  //add one per type so we get a unique id for all of these, although this will prob bug out if another person batches at the exact same time -- should probably adjust for this ~
+                //SGBatchID = batchTemp + 2;
+                //NonSGBatchID = batchTemp + 3;
+
+                AllBatchID = batchTemp;
 
                 int temp = 0;
                 while (count > 0)
@@ -294,18 +327,21 @@ namespace autoBatch
                     using (SqlCommand cmdBatchID = new SqlCommand("Select MAX(batch_id) + 1 FROM dbo.batch", conn))
                         batch_id = Convert.ToInt32(cmdBatchID.ExecuteScalar());
 
-                    if (dt.Rows[0][10].ToString() == "SG")
-                        batch_id = SGBatchID;
-                    else if (dt.Rows[0][10].ToString() == "NonSG")
-                        batch_id = NonSGBatchID;
-                    else if (dt.Rows[0][10].ToString() == "RotecNonSG")
-                        batch_id = rotecNonSGBatchID;
-                    else if (dt.Rows[0][10].ToString() == "RotecSG")
-                        batch_id = rotecSGBatchID;
+                    if (dt.Rows[0][10].ToString() == "ALL")
+                        batch_id = AllBatchID;
+
 
 
                     sql = "INSERT INTO dbo.batch (door_id,batch_date,batch_id,part_batched,offcut) VALUES" +
                     "(" + door_id.ToString() + ",GETDATE()," + batch_id.ToString() + ",0,0)";
+                    using (SqlCommand cmd = new SqlCommand(sql, conn))
+                        cmd.ExecuteNonQuery();
+                    Console.WriteLine(sql);
+
+                    Console.WriteLine("------------");
+
+                    sql = "INSERT INTO [dsl_logs].dbo.batch (user,[date],door_id,batch_id,para_1,action,procedure_name) VALUES" +
+                    "('Auto Batch',GETDATE()," + door_id.ToString() + "," + batch_id.ToString() + ",'NA','Auto Batch','NA')";
                     using (SqlCommand cmd = new SqlCommand(sql, conn))
                         cmd.ExecuteNonQuery();
                     Console.WriteLine(sql);
@@ -481,8 +517,8 @@ namespace autoBatch
                             programCounter++;
                         }
 
-                        //Console.WriteLine(sql);
-                        //Console.WriteLine("--"); ;
+                        Console.WriteLine(sql);
+                        Console.WriteLine("--"); ;
 
                     }
                     counter = counter + 1;
@@ -573,19 +609,23 @@ namespace autoBatch
                     doorCount = Convert.ToInt32(cmd.ExecuteScalar());
                 while (counter < doorCount)
                 {
+                    finnBatchDT.Clear();
                     //grouping
                     sql = "SELECT [group] FROM dbo.auto_batch_rainer_batch where program_id = '" + dt.Rows[counter][2] + "'";
                     using (SqlCommand cmd = new SqlCommand(sql, conn))
                         grouping = Convert.ToString(cmd.ExecuteScalar());
                     //batchheader
-                    if (dt.Rows[0][10].ToString() == "SG")
-                        batch_id = SGBatchID;
-                    else if (dt.Rows[0][10].ToString() == "NonSG")
-                        batch_id = NonSGBatchID;
-                    else if (dt.Rows[0][10].ToString() == "RotecNonSG")
-                        batch_id = rotecNonSGBatchID;
-                    else if (dt.Rows[0][10].ToString() == "RotecSG")
-                        batch_id = rotecSGBatchID;
+                    //if (dt.Rows[0][10].ToString() == "SG")
+                    //    batch_id = SGBatchID;
+                    //else if (dt.Rows[0][10].ToString() == "NonSG")
+                    //    batch_id = NonSGBatchID;
+                    //else if (dt.Rows[0][10].ToString() == "RotecNonSG")
+                    //    batch_id = rotecNonSGBatchID;
+                    //else if (dt.Rows[0][10].ToString() == "RotecSG")
+                    //    batch_id = rotecSGBatchID;
+
+                    batch_id = AllBatchID;
+
                     sql = "insert into dbo.batch_header (qid, qname, datecreated, machine) values ('" + batch_id + "','" + grouping.ToString() + "','" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "','RAINER');";
                     if (grouping.Length < 2)
                     {
@@ -603,7 +643,7 @@ namespace autoBatch
                     {
                         groupingList.Add(grouping); //dont enter this path again for this grouping 
 
-                        string path =  @"\\YWSKPC\JobList\" + grouping + @".xml"; //@"//DESIGNSVR1\dropbox\xml\" + grouping + @".xml";  //
+                        string path = @"\\YWSKPC\JobList\" + grouping + @".xml"; //@"//DESIGNSVR1\dropbox\xml\" + grouping + @".xml";  //
                         try
                         {
                             if (!File.Exists(path))
@@ -921,7 +961,7 @@ namespace autoBatch
         private static void moveXML()
         {
             //try and move old xmls here IF they exist
-            string sourceDirectory = @"//DESIGNSVR1\dropbop\xml";
+            string sourceDirectory = @"//DESIGNSVR1\dropbox\xml";
             string destinationDirectory = @"//DESIGNSVR1\dropbox\IT_FAILED\moved_xml";
 
             try
